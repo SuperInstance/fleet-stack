@@ -1,0 +1,10 @@
+FROM python:3.11-alpine
+
+WORKDIR /app
+
+COPY scripts/seed-event-bus-room.py .
+
+ENV PYTHONUNBUFFERED=1
+ENV PLATO_URL=http://plato:8847
+
+CMD ["python3", "seed-event-bus-room.py"]

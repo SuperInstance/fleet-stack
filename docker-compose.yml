@@ -66,5 +66,33 @@ services:
       - router
     restart: unless-stopped
 
+  # ── Event Bus Seed (one-shot init) ──
+  # Seeds the event-bus pubsub room on first startup
+  seed:
+    build:
+      context: .
+      dockerfile: Dockerfile.seed
+    environment:
+      - PLATO_URL=http://plato:8847
+    depends_on:
+      plato:
+        condition: service_healthy
+    restart: "no"
+
+  # ── Conservation Law Monitor (continuous daemon) ──
+  # Polls all PLATO rooms and checks tiles for conservation law compliance
+  conservation:
+    build:
+      context: services/conservation
+      dockerfile: Dockerfile
+    environment:
+      - PLATO_URL=http://plato:8847
+      - POLL_INTERVAL=60
+      - MONITORED_ROOMS=research_log,fleet_math,event-bus
+    depends_on:
+      plato:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   plato-data:

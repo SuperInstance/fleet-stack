@@ -1,0 +1,70 @@
+version: "3.8"
+
+# PlatoClaw Fleet Stack — one command to rule them all
+# docker compose up -d
+
+services:
+  # ── PLATO Server (the shell) ──
+  plato:
+    build:
+      context: ../platoclaw
+      dockerfile: Dockerfile
+    ports:
+      - "8847:8847"
+    environment:
+      - PLATO_PORT=8847
+    volumes:
+      - plato-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8847/status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # ── Fleet Router (the engine) ──
+  router:
+    build:
+      context: ../fleet-router
+      dockerfile: Dockerfile
+    ports:
+      - "8100:8100"
+    environment:
+      - DEEPINFRA_KEY=${DEEPINFRA_KEY}
+      - GROQ_KEY=${GROQ_KEY}
+      - ZAI_KEY=${ZAI_KEY}
+      - PLATO_URL=http://plato:8847
+    depends_on:
+      plato:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── PLATO MCP Bridge (the compatibility) ──
+  mcp:
+    build:
+      context: ../plato-mcp
+      dockerfile: Dockerfile
+    ports:
+      - "8300:8300"
+    environment:
+      - PLATO_URL=http://plato:8847
+      - FLEET_ROUTER_URL=http://router:8100
+    depends_on:
+      plato:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Web Dashboard ──
+  web:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ../platoclaw/web:/usr/share/nginx/html:ro
+    depends_on:
+      - plato
+      - router
+    restart: unless-stopped
+
+volumes:
+  plato-data:

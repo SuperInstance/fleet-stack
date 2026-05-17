@@ -66,5 +66,28 @@ services:
       - router
     restart: unless-stopped
 
+  # ── Hebbian Service (conservation-constrained routing) ──
+  hebbian:
+    build:
+      context: ..
+      dockerfile: Dockerfile.hebbian
+    ports:
+      - "8849:8849"
+    environment:
+      - PLATO_URL=http://plato:8847
+    volumes:
+      - hebbian-data:/data
+      - ../.local-plato/plato.db:/data/plato.db:ro
+    depends_on:
+      plato:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8849/status')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
 volumes:
   plato-data:
+  hebbian-data:

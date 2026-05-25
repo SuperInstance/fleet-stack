@@ -107,4 +107,90 @@ Any Client → Fleet Router (:8100) → Cheapest Safe Model
 
 The math is invisible. You just complete the room task.
 
-**New:** The conservation monitor runs alongside the fleet, ensuring all tiles respect the gamma+H invariant. The event bus room decouples services — any agent can publish, any officer can subscribe.
+## Fleet Architecture
+
+```
+                         ┌─────────────────┐
+                         │   Any Client     │
+                         └────────┬────────┘
+                                  │
+                         ┌────────▼────────┐
+                         │  Fleet Router    │ :8100
+                         │  (OpenAI compat) │
+                         └────────┬────────┘
+                                  │
+              ┌───────────────────┼───────────────────┐
+              │                   │                   │
+     ┌────────▼────────┐         │          ┌────────▼────────┐
+     │  Cheapest Safe   │         │          │   MCP Bridge    │ :8300
+     │  Model (LLM)     │         │          │ (tools for any   │
+     └─────────────────┘         │          │  framework)      │
+                                 │          └─────────────────┘
+                         ┌───────▼────────┐
+                         │   PLATO Core    │ :8847
+                         │  Rooms + Tiles  │
+                         │  + Routing      │
+                         └───────┬────────┘
+                                 │
+              ┌──────────────────┼───────────────────┐
+              │                  │                    │
+     ┌────────▼───────┐ ┌──────▼──────┐  ┌─────────▼──────┐
+     │ Officers        │ │ Event Bus   │  │ Conservation   │
+     │ (room maintain) │ │ (pubsub)    │  │ Monitor        │
+     └────────────────┘ └─────────────┘  └────────────────┘
+```
+
+### Data Flow
+
+1. **Client sends prompt** → Fleet Router picks cheapest safe model
+2. **Model responds** → PLATO routes response to appropriate room
+3. **Room officers** maintain tile quality via quality gate scoring
+4. **Conservation monitor** checks all tiles against γ + H invariant
+5. **Event bus** decouples services — any agent can publish, any officer can subscribe
+
+## Deployment Guide
+
+### Prerequisites
+
+- Docker and Docker Compose
+- API keys for at least one LLM provider
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DEEPINFRA_KEY` | Yes* | DeepInfra API key |
+| `GROQ_KEY` | Yes* | Groq API key |
+| `ZAI_KEY` | Yes* | ZAI API key |
+| `POLL_INTERVAL` | No | Conservation monitor interval (default: 60s) |
+| `MONITORED_ROOMS` | No | Comma-separated room list |
+
+*At least one LLM provider key required.
+
+### Scaling
+
+```bash
+# Scale specific services
+docker compose up -d --scale plato=3
+
+# View logs
+docker compose logs -f plato
+docker compose logs -f conservation-monitor
+
+# Stop everything
+docker compose down
+```
+
+## Related Repos
+
+| Repo | Role |
+|------|------|
+| [plato-core](https://github.com/SuperInstance/plato-core) | Base types + mesh registry |
+| [quality-gate-stream](https://github.com/SuperInstance/quality-gate-stream) | Tile quality scoring |
+| [constraint-theory-core](https://github.com/SuperInstance/constraint-theory-core) | Conservation law math |
+| [flux-vm-v3](https://github.com/SuperInstance/flux-vm-v3) | Constraint verification VM |
+| [cocapn-cli](https://github.com/SuperInstance/cocapn-cli) | Fleet terminal theme |
+
+## License
+
+MIT
